@@ -18,6 +18,7 @@ from app.api.schemas import (
 from app.core.config import settings
 from app.security.privacy import generate_request_id, verify_auth_boundary
 from app.services.asr_service import ASRService
+from app.services.deepgram_words import build_words, overall_confidence
 
 router = APIRouter()
 
@@ -252,15 +253,8 @@ async def deepgram_compatible_listen(
 
     transcript = result.get("transcript", "")
     segments = result.get("segments", [])
-    words = []
-    for s in segments:
-        for w in (s.get("text", "")).split():
-            words.append({
-                "word": w,
-                "start": s.get("start", 0.0),
-                "end": s.get("end", 0.0),
-                "confidence": 0.98
-            })
+    words = build_words(segments)
+    confidence = overall_confidence(words)
 
     return {
         "metadata": {
@@ -276,7 +270,7 @@ async def deepgram_compatible_listen(
                     "alternatives": [
                         {
                             "transcript": transcript,
-                            "confidence": 0.98,
+                            "confidence": confidence,
                             "words": words,
                             "paragraphs": {
                                 "transcript": transcript,

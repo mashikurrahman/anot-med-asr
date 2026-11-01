@@ -84,6 +84,8 @@ class Settings(BaseModel):
     WHISPER_PLAIN: bool = Field(default_factory=lambda: os.getenv("ANOT_WHISPER_PLAIN", "false").lower() == "true")
     # Fix high-confidence drug-name mishearings (albedo -> albuterol) after ASR.
     TERM_CORRECTION: bool = Field(default_factory=lambda: os.getenv("ANOT_TERM_CORRECTION", "false").lower() == "true")
+    # Real per-word timestamps/probabilities (used by /v1/listen). Costs a little extra decode time.
+    WHISPER_WORD_TIMESTAMPS: bool = Field(default_factory=lambda: os.getenv("ANOT_WHISPER_WORD_TIMESTAMPS", "false").lower() == "true")
     WHISPER_HOTWORDS: str = Field(default_factory=lambda: os.getenv("ANOT_WHISPER_HOTWORDS", ""))
     # Anti-hallucination / silence-rejection thresholds (faster-whisper defaults
     # tightened slightly for clinical audio).

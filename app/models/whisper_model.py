@@ -155,6 +155,7 @@ class WhisperASRModel:
             language=fw_language,
             beam_size=settings.WHISPER_BEAM_SIZE,
             vad_filter=True,
+            word_timestamps=settings.WHISPER_WORD_TIMESTAMPS,
             condition_on_previous_text=False,  # avoids runaway repetition on silence
             initial_prompt=initial_prompt,
             hotwords=hotwords,
@@ -183,6 +184,9 @@ class WhisperASRModel:
                 "avg_logprob": round(avg_lp, 3) if avg_lp is not None else None,
                 "no_speech_prob": round(no_speech, 3) if no_speech is not None else None,
                 "low_confidence": bool(is_low),
+                **({"words": [{"word": w.word, "start": round(w.start, 3), "end": round(w.end, 3),
+                               "probability": round(w.probability, 3)} for w in s.words]}
+                   if settings.WHISPER_WORD_TIMESTAMPS and getattr(s, "words", None) else {}),
             })
 
         inference_time = time.perf_counter() - t0
