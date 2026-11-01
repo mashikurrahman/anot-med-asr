@@ -54,7 +54,10 @@ image = (
         "ANOT_ASR_ENGINE": "whisper",
         "ANOT_ASR_ENV": "production",
         "ANOT_ASR_DEBUG": "false",
-        "ANOT_WHISPER_MODEL": "large-v3",
+        "ANOT_WHISPER_MODEL": "/vol/models/ft-ct2",  # fine-tuned (PHI-derived) weights, private volume only
+        "ANOT_WHISPER_PLAIN": "true",
+        "ANOT_TERM_CORRECTION": "true",
+        "ANOT_WHISPER_NO_SPEECH_THRESHOLD": "0.8",
         "ANOT_WHISPER_DEVICE": "cuda",
         "ANOT_WHISPER_COMPUTE_TYPE": "float16",
         "ANOT_WHISPER_BEAM_SIZE": "5",   # GPU is fast; use max accuracy
@@ -80,6 +83,7 @@ image = (
     gpu="T4",
     scaledown_window=300,          # keep warm 5 min after last request, then scale to 0
     timeout=60 * 30,              # allow long recordings
+    volumes={"/vol": modal.Volume.from_name("asr-ft")},
     secrets=[modal.Secret.from_name("anot-asr")],  # provides ANOT_ASR_API_KEY (+ optional CORS)
 )
 @modal.concurrent(max_inputs=4)

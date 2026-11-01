@@ -120,3 +120,7 @@ tests/test_dataset_inventory.py
 tests/test_conversation_diagnostic.py
 tests/test_clinical_encounter.py
 tests/test_real_benchmark.py
+
+# Fine-tuning working data (PHI-derived clips + transcripts)
+scratch_ft_data/
+scratch_words.json

@@ -36,8 +36,11 @@ def fft_highpass(wave: np.ndarray, sample_rate: int, cutoff_hz: float = 70.0) ->
     n = wave.size
     if n == 0 or cutoff_hz <= 0:
         return wave
-    spectrum = np.fft.rfft(wave)
-    freqs = np.fft.rfftfreq(n, d=1.0 / sample_rate)
+    # Zero-pad to a power of two: NumPy's FFT is ~20x slower on awkward lengths,
+    # which made a 30-minute recording spend ~35 s in this filter alone.
+    n_fft = 1 << (n - 1).bit_length()
+    spectrum = np.fft.rfft(wave, n=n_fft)
+    freqs = np.fft.rfftfreq(n_fft, d=1.0 / sample_rate)
     # Smooth raised-cosine transition over [cutoff/2, cutoff] to avoid ringing.
     lo, hi = cutoff_hz * 0.5, cutoff_hz
     mask = np.ones_like(freqs)
@@ -45,7 +48,7 @@ def fft_highpass(wave: np.ndarray, sample_rate: int, cutoff_hz: float = 70.0) ->
     trans = (freqs >= lo) & (freqs < hi)
     mask[below] = 0.0
     mask[trans] = 0.5 * (1 - np.cos(np.pi * (freqs[trans] - lo) / (hi - lo)))
-    filtered = np.fft.irfft(spectrum * mask, n=n)
+    filtered = np.fft.irfft(spectrum * mask, n=n_fft)[:n]
     return filtered.astype(wave.dtype, copy=False)
 
 
@@ -73,6 +76,58 @@ def normalize_loudness(
     return out.astype(wave.dtype, copy=False)
 
 
+def gain_ride(
+    wave: np.ndarray,
+    sample_rate: int = 16000,
+    target_db: float = -26.0,
+    max_boost_db: float = 25.0,
+    noise_floor_db: float = -62.0,
+    frame_sec: float = 0.5,
+    window_sec: float = 20.0,
+    step_sec: float = 2.0,
+) -> np.ndarray:
+    """
+    Windowed AGC ("gain riding") for recordings whose level drifts (phone moved
+    away from the speakers, patient turns away). A single global gain is set by
+    the loudest minutes and leaves the distant stretches below the ASR's VAD and
+    decoder range, which showed up as >80% word loss in the quiet half of long
+    visits.
+
+    The local speech level is the 90th-percentile frame loudness in a sliding
+    window; each region is boosted (never attenuated) toward `target_db`, capped
+    at `max_boost_db`. Regions whose local level is under `noise_floor_db` get no
+    gain, so silence and room noise are not amplified. Gains are linearly
+    interpolated between window centres to avoid audible steps.
+    """
+    if wave is None or wave.size == 0:
+        return wave
+    x = np.asarray(wave, dtype=np.float32)
+    frame = max(1, int(frame_sec * sample_rate))
+    n_frames = x.size // frame
+    if n_frames < 2:
+        return x.copy()
+
+    frames = x[: n_frames * frame].reshape(n_frames, frame)
+    frame_db = 20.0 * np.log10(np.sqrt(np.mean(np.square(frames), axis=1)) + EPS)
+
+    half = max(1, int(window_sec / frame_sec / 2))
+    step = max(1, int(step_sec / frame_sec))
+    centres = np.arange(0, n_frames, step)
+    if centres[-1] != n_frames - 1:
+        centres = np.append(centres, n_frames - 1)
+    gains_db = np.zeros(centres.size, dtype=np.float64)
+    for k, c in enumerate(centres):
+        level = float(np.percentile(frame_db[max(0, c - half): c + half + 1], 90))
+        if level > noise_floor_db:
+            gains_db[k] = float(np.clip(target_db - level, 0.0, max_boost_db))
+
+    sample_pos = np.arange(x.size, dtype=np.float64)
+    centre_pos = (centres + 0.5) * frame
+    gain = 10.0 ** (np.interp(sample_pos, centre_pos, gains_db) / 20.0)
+    out = np.clip(x * gain.astype(np.float32), -1.0, 1.0)
+    return np.nan_to_num(out).astype(np.float32, copy=False)
+
+
 def enhance_waveform(
     wave: np.ndarray,
     sample_rate: int = 16000,
@@ -81,11 +136,13 @@ def enhance_waveform(
     loudness_norm: bool = True,
     target_dbfs: float = -20.0,
     denoise: bool = False,
+    gain_riding: bool = False,
 ) -> np.ndarray:
     """
     Apply the front-end chain. Returns a new array (input is never mutated).
 
-    Order: DC removal -> high-pass -> optional denoise -> loudness normalization.
+    Order: DC removal -> high-pass -> optional denoise -> optional gain riding
+    -> loudness normalization.
     `denoise` uses the `noisereduce` library if installed; otherwise it is a
     graceful no-op (the chain still helps via high-pass + AGC).
     """
@@ -97,6 +154,8 @@ def enhance_waveform(
         out = fft_highpass(out, sample_rate, highpass_cutoff_hz)
     if denoise:
         out = _maybe_denoise(out, sample_rate)
+    if gain_riding:
+        out = gain_ride(out, sample_rate)
     if loudness_norm:
         out = normalize_loudness(out, target_dbfs=target_dbfs)
     # Final safety: clip to valid range and keep finite.

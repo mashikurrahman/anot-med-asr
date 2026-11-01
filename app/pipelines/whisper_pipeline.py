@@ -21,6 +21,7 @@ from app.core.config import settings
 from app.models.whisper_model import WhisperASRModel
 from app.services.normalization_service import NormalizationService
 from audio.enhancement import enhance_waveform
+from language_model.term_corrector import correct_terms
 
 
 class WhisperPipeline:
@@ -56,6 +57,7 @@ class WhisperPipeline:
                 loudness_norm=settings.AUDIO_LOUDNESS_NORM,
                 target_dbfs=settings.AUDIO_TARGET_DBFS,
                 denoise=settings.AUDIO_DENOISE,
+                gain_riding=settings.AUDIO_GAIN_RIDE,
             )
             enhance_time = time.perf_counter() - t_enh
 
@@ -63,14 +65,20 @@ class WhisperPipeline:
             proc_wave, sample_rate, language=language)
         detected_language = getattr(self.model, "_last_detected_language", language or "en")
 
+        # High-confidence drug-name fixes (English only); raw_transcript stays untouched.
+        text, seg_list = raw_text, raw_segments
+        if settings.TERM_CORRECTION and str(detected_language).lower().startswith("en"):
+            text = correct_terms(raw_text)
+            seg_list = [{**seg, "text": correct_terms(seg["text"])} for seg in raw_segments]
+
         norm_time = 0.0
-        final_text = raw_text
-        segments = raw_segments
-        if normalize and raw_text:
-            final_text, _events, norm_time = self.normalization_service.normalize_text(raw_text)
+        final_text = text
+        segments = seg_list
+        if normalize and text:
+            final_text, _events, norm_time = self.normalization_service.normalize_text(text)
             # Normalize each segment's text too, so segment views stay consistent.
             norm_segments = []
-            for seg in raw_segments:
+            for seg in seg_list:
                 seg_text, _ev, _t = self.normalization_service.normalize_text(seg["text"])
                 norm_segments.append({**seg, "text": seg_text})
             segments = norm_segments

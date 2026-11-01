@@ -14,6 +14,7 @@ import numpy as np
 from audio.enhancement import (
     enhance_waveform,
     fft_highpass,
+    gain_ride,
     normalize_loudness,
     remove_dc,
 )
@@ -63,6 +64,57 @@ class TestAudioEnhancement(unittest.TestCase):
     def test_does_not_amplify_pure_silence(self):
         out = normalize_loudness(np.zeros(SR, dtype=np.float32))
         self.assertAlmostEqual(float(np.max(np.abs(out))), 0.0, places=6)
+
+def _speechlike(dur, amp, seed):
+    """Band-limited noise bursts (0.4s on / 0.2s off) standing in for speech."""
+    rng = np.random.default_rng(seed)
+    out = np.zeros(int(dur * SR), dtype=np.float32)
+    for start in np.arange(0, dur - 0.4, 0.6):
+        i = int(start * SR)
+        out[i:i + int(0.4 * SR)] = amp * rng.standard_normal(int(0.4 * SR))
+    return out
+
+
+def _rms_db(x):
+    return 20 * np.log10(np.sqrt(np.mean(np.square(x))) + 1e-12)
+
+
+class TestGainRide(unittest.TestCase):
+    def test_quiet_section_is_lifted_toward_loud_section(self):
+        loud = _speechlike(60, 0.1, 1)
+        quiet = _speechlike(60, 0.003, 2)  # ~30 dB lower
+        out = gain_ride(np.concatenate([loud, quiet]), SR)
+        gap_before = _rms_db(loud) - _rms_db(quiet)
+        gap_after = _rms_db(out[: loud.size]) - _rms_db(out[loud.size:])
+        self.assertLess(gap_after, gap_before / 2)
+
+    def test_does_not_amplify_silence_or_noise_floor(self):
+        floor = (1e-5 * np.random.default_rng(3).standard_normal(SR * 30)).astype(np.float32)
+        out = gain_ride(floor, SR)
+        self.assertLess(_rms_db(out), -60.0)
+
+    def test_preserves_shape_dtype_and_input(self):
+        sig = _speechlike(20, 0.05, 4)
+        before = sig.copy()
+        out = gain_ride(sig, SR)
+        self.assertEqual(out.shape, sig.shape)
+        self.assertEqual(out.dtype, np.float32)
+        np.testing.assert_array_equal(sig, before)
+        self.assertTrue(np.all(np.isfinite(out)))
+        self.assertLessEqual(float(np.max(np.abs(out))), 1.0)
+
+    def test_empty_and_short_inputs_are_safe(self):
+        self.assertEqual(gain_ride(np.zeros(0, dtype=np.float32), SR).size, 0)
+        short = _tone(300, dur=0.2)
+        self.assertEqual(gain_ride(short, SR).shape, short.shape)
+
+    def test_wired_into_enhance_waveform_only_when_requested(self):
+        loud = _speechlike(40, 0.1, 5)
+        quiet = _speechlike(40, 0.003, 6)
+        sig = np.concatenate([loud, quiet])
+        base = enhance_waveform(sig, SR)
+        rode = enhance_waveform(sig, SR, gain_riding=True)
+        self.assertGreater(_rms_db(rode[loud.size:]), _rms_db(base[loud.size:]) + 6)
 
 
 if __name__ == "__main__":

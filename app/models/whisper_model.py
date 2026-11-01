@@ -146,8 +146,8 @@ class WhisperASRModel:
 
         lang = (language or settings.WHISPER_LANGUAGE or "en").lower()
         fw_language = None if lang == "auto" else lang  # None => Whisper auto-detect
-        hotwords = _resolve_hotwords(lang)
-        initial_prompt = _resolve_prompt(lang)
+        hotwords = None if settings.WHISPER_PLAIN else _resolve_hotwords(lang)
+        initial_prompt = None if settings.WHISPER_PLAIN else _resolve_prompt(lang)
 
         t0 = time.perf_counter()
         seg_iter, _info = self._model.transcribe(

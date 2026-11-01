@@ -79,6 +79,11 @@ class Settings(BaseModel):
     WHISPER_INITIAL_PROMPT: str = Field(default_factory=lambda: os.getenv("ANOT_WHISPER_INITIAL_PROMPT", ""))
     # Comma-separated domain terms to bias spelling (drugs, clinic terms). Mined
     # from local notes or set manually; empty string disables.
+    # "true" = send no initial prompt / hotwords. The fine-tuned model was trained and
+    # validated without them (prompting did not help it), so deploy it with this on.
+    WHISPER_PLAIN: bool = Field(default_factory=lambda: os.getenv("ANOT_WHISPER_PLAIN", "false").lower() == "true")
+    # Fix high-confidence drug-name mishearings (albedo -> albuterol) after ASR.
+    TERM_CORRECTION: bool = Field(default_factory=lambda: os.getenv("ANOT_TERM_CORRECTION", "false").lower() == "true")
     WHISPER_HOTWORDS: str = Field(default_factory=lambda: os.getenv("ANOT_WHISPER_HOTWORDS", ""))
     # Anti-hallucination / silence-rejection thresholds (faster-whisper defaults
     # tightened slightly for clinical audio).
@@ -95,6 +100,9 @@ class Settings(BaseModel):
     AUDIO_LOUDNESS_NORM: bool = Field(default_factory=lambda: os.getenv("ANOT_AUDIO_LOUDNESS_NORM", "true").lower() == "true")
     AUDIO_TARGET_DBFS: float = Field(default_factory=lambda: float(os.getenv("ANOT_AUDIO_TARGET_DBFS", "-20.0")))
     AUDIO_DENOISE: bool = Field(default_factory=lambda: os.getenv("ANOT_AUDIO_DENOISE", "false").lower() == "true")
+    # Windowed AGC for recordings whose level drifts (distant/moving mic). Off
+    # until validated on the human-verified benchmark.
+    AUDIO_GAIN_RIDE: bool = Field(default_factory=lambda: os.getenv("ANOT_AUDIO_GAIN_RIDE", "false").lower() == "true")
 
     # Default inference options
     MODE_DEFAULT: str = Field(default_factory=lambda: os.getenv("ANOT_ASR_MODE_DEFAULT", "dictation"))
