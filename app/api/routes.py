@@ -13,14 +13,18 @@ from app.api.schemas import (
     ErrorResponse,
     HealthResponse,
     ReadyResponse,
+    SoapNote,
+    SoapRequest,
     TranscribeResponse
 )
 from app.core.config import settings
 from app.security.privacy import generate_request_id, verify_auth_boundary
 from app.services.asr_service import ASRService
 from app.services.deepgram_words import build_words, overall_confidence
+from app.services.soap_service import SoapGenerationError, SoapService
 
 router = APIRouter()
+_soap = SoapService()
 
 
 @router.get(
@@ -87,6 +91,7 @@ async def transcribe_audio(
     normalize: bool = Form(default=True, description="Enable deterministic clinical representation normalization"),
     engine: Optional[str] = Form(default=None, description="ASR engine: 'whisper' (default, best for visits) or 'medasr' (dictation)"),
     language: Optional[str] = Form(default=None, description="Language code ('en', 'bn', ...), 'auto' to detect, or blank for the configured default. Whisper engine only."),
+    soap: bool = Form(default=False, description="Also generate a SOAP note from the transcript"),
 ) -> TranscribeResponse:
     # 1. Early parameter and extension validation (prior to resource allocation)
     ext = pathlib.Path(file.filename or "").suffix.lower()
@@ -157,7 +162,26 @@ async def transcribe_audio(
         language=(language or None),
     )
 
+    if soap:
+        try:
+            result = {**result, "soap_note": await _soap.generate(result.get("transcript", ""), req_id)}
+        except SoapGenerationError as e:  # the transcript is still returned
+            result = {**result, "soap_error": str(e)}
     return TranscribeResponse(**result)
+
+
+@router.post(
+    "/api/v1/soap",
+    response_model=SoapNote,
+    dependencies=[Depends(verify_auth_boundary)],
+    summary="Generate a SOAP Note from a Transcript",
+    description="Turns transcript text (for example from /api/v1/transcribe) into a SOAP note with review flags."
+)
+async def generate_soap(body: SoapRequest) -> SoapNote:
+    try:
+        return SoapNote(**await _soap.generate(body.transcript, generate_request_id()))
+    except SoapGenerationError as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e)) from e
 
 
 @router.post(
@@ -172,6 +196,7 @@ async def transcribe_conversation(
     normalize: bool = Form(default=True, description="Enable clinical representation normalization"),
     engine: Optional[str] = Form(default=None, description="ASR engine: 'whisper' (default) or 'medasr'"),
     language: Optional[str] = Form(default=None, description="Language code, 'auto', or blank for default"),
+    soap: bool = Form(default=False, description="Also generate a SOAP note from the transcript"),
 ) -> TranscribeResponse:
     """Specialized endpoint for ambient conversation workflow."""
     return await transcribe_audio(
@@ -185,6 +210,7 @@ async def transcribe_conversation(
         normalize=normalize,
         engine=engine if isinstance(engine, str) else None,
         language=language if isinstance(language, str) else None,
+        soap=soap if isinstance(soap, bool) else False,
     )
 
 

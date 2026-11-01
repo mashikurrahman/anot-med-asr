@@ -35,6 +35,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     "uvicorn[standard]==0.34.0" \
     python-multipart==0.0.32 \
     pydantic==2.13.5 \
+    "anthropic>=2.3.0" \
     soundfile==0.13.1 \
     numpy>=1.26.0
 

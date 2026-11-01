@@ -41,6 +41,7 @@ image = (
         "soundfile==0.13.1",
         "numpy>=1.26.0",
         "transformers==4.49.0",
+        "anthropic>=2.3.0",
     )
     # torch (CPU wheel) only to satisfy imports; Whisper runs on GPU via CTranslate2.
     .pip_install("torch==2.6.0", index_url="https://download.pytorch.org/whl/cpu")
@@ -88,7 +89,10 @@ image = (
     scaledown_window=300,          # keep warm 5 min after last request, then scale to 0
     timeout=60 * 30,              # allow long recordings
     volumes={"/vol": modal.Volume.from_name("asr-ft")},
-    secrets=[modal.Secret.from_name("anot-asr")],  # provides ANOT_ASR_API_KEY (+ optional CORS)
+    secrets=[
+        modal.Secret.from_name("anot-asr"),  # provides ANOT_ASR_API_KEY (+ optional CORS)
+        modal.Secret.from_name("anot-anthropic"),  # provides ANTHROPIC_API_KEY (SOAP notes)
+    ],
 )
 @modal.concurrent(max_inputs=4)
 @modal.asgi_app()

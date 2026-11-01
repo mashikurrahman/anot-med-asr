@@ -57,6 +57,20 @@ class PerformanceMetrics(BaseModel):
     rtf: Optional[float] = Field(default=None, description="Real-Time Factor (total processing time / audio duration)")
 
 
+class SoapNote(BaseModel):
+    """SOAP note generated from a transcript."""
+    subjective: str
+    objective: str
+    assessment: str
+    plan: str
+    flags: List[str] = Field(default_factory=list, description="Items the clinician should review")
+    model: Optional[str] = Field(default=None, description="Model that wrote the note")
+
+
+class SoapRequest(BaseModel):
+    transcript: str = Field(min_length=1, max_length=400_000, description="Transcript text to summarize")
+
+
 class TranscribeResponse(BaseModel):
     """Standardized versioned response for all transcription requests."""
     request_id: str = Field(description="Unique neutral request ID", example="ASR-20261003-000001")
@@ -70,6 +84,8 @@ class TranscribeResponse(BaseModel):
     decoder: DecoderInfo = Field(description="Decoder configuration details")
     confidence: Optional[Dict[str, Any]] = Field(default=None, description="Confidence summary (low-confidence segment counts) for review/fallback routing")
     performance: Optional[Dict[str, Any]] = Field(default=None, description="Safe technical execution timings")
+    soap_note: Optional[SoapNote] = Field(default=None, description="SOAP note, when requested with soap=true")
+    soap_error: Optional[str] = Field(default=None, description="Why the SOAP note is missing (the transcript is still valid)")
 
 
 class ErrorResponse(BaseModel):

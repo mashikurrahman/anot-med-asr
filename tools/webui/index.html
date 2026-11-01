@@ -88,6 +88,7 @@
       <input id="file" type="file" accept="audio/*,.m4a,.wav,.mp3,.flac,.mp4,.aac,.ogg" style="display:none" />
       <audio id="preview" controls style="display:none"></audio>
       <div id="fname" class="hint"></div>
+      <label class="hint" style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" id="soap" checked style="width:auto"> Also generate a SOAP note</label>
       <button id="go" disabled>Transcribe</button>
     </div>
   </div>
@@ -101,6 +102,12 @@
     <div class="pills" id="meta" style="margin-top:12px"></div>
     <pre id="transcript"></pre>
     <div id="segs"></div>
+    <div id="soapbox" style="display:none;margin-top:18px">
+      <div class="flexbetween"><h2 style="margin:0">SOAP note</h2>
+        <button class="ghost" id="copysoap">Copy SOAP note</button></div>
+      <div id="soapflags" class="hint" style="color:var(--warn)"></div>
+      <pre id="soaptext" style="white-space:pre-wrap;word-break:break-word;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px;font-size:14px;margin:8px 0 0"></pre>
+    </div>
   </div>
 </div>
 
@@ -156,9 +163,9 @@ $('go').onclick = async () => {
   if(!file) return;
   const base=$('url').value.replace(/\/$/,'');
   const fd=new FormData();
-  fd.append('file',file); fd.append('mode',$('mode').value); fd.append('engine',$('engine').value);
+  fd.append('file',file); fd.append('soap',$('soap').checked?'true':'false'); fd.append('mode',$('mode').value); fd.append('engine',$('engine').value);
   if($('language').value) fd.append('language',$('language').value);
-  $('go').disabled=true; $('out').style.display='block'; $('meta').innerHTML=''; $('segs').innerHTML='';
+  $('go').disabled=true; $('out').style.display='block'; $('meta').innerHTML=''; $('segs').innerHTML=''; $('soapbox').style.display='none';
   let secs=0; $('transcript').innerHTML='<span class="spin">◐</span> transcribing…';
   const timer=setInterval(()=>{ secs++; $('go').textContent='Transcribing… '+secs+'s'; },1000);
   const t0=performance.now();
@@ -178,7 +185,7 @@ $('go').onclick = async () => {
         pill('engine',d.engine||$('engine').value)+pill('lang',d.language||'?')+
         pill('duration',fmt(d.duration_seconds))+pill('rtf',p.rtf??'?')+
         pill('took',took+'s')+pill('low-conf',(c.low_confidence_segments??'?')+'/'+(c.segments_total??'?'));
-      $('transcript').textContent=d.transcript||'(empty transcript)';
+      $('transcript').textContent=d.transcript||'(empty transcript)'; showSoap(d);
       const segs=d.segments||[];
       $('segs').innerHTML = segs.length ? segs.map(s=>
         '<div class="seg'+(s.low_confidence?' low':'')+'"><span class="ts">'+fmt(s.start)+'–'+fmt(s.end)+'</span><span>'+
@@ -191,6 +198,20 @@ $('go').onclick = async () => {
   }
   $('go').disabled=false; $('go').textContent='Transcribe'; save();
 };
+
+function showSoap(d){
+  const box=$('soapbox'), txt=$('soaptext'), fl=$('soapflags');
+  fl.innerHTML=''; txt.textContent='';
+  if(d.soap_note){
+    const n=d.soap_note;
+    txt.textContent=['SUBJECTIVE',n.subjective,'','OBJECTIVE',n.objective,'','ASSESSMENT',n.assessment,'','PLAN',n.plan].join('\n');
+    if((n.flags||[]).length) fl.innerHTML='<b>For clinician review:</b><br>'+n.flags.map(f=>'• '+escapeHtml(f)).join('<br>');
+    box.style.display='block';
+  } else if(d.soap_error){
+    txt.textContent='SOAP note not available: '+d.soap_error; box.style.display='block';
+  }
+}
+$('copysoap').onclick=()=>{ navigator.clipboard.writeText($('soaptext').textContent||''); $('copysoap').textContent='Copied!'; setTimeout(()=>$('copysoap').textContent='Copy SOAP note',1200); };
 function pill(k,v){ return '<span class="pill">'+k+': <b>'+v+'</b></span>'; }
 function escapeHtml(s){ return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 $('copy').onclick=()=>{ navigator.clipboard.writeText($('transcript').textContent||''); $('copy').textContent='Copied!'; setTimeout(()=>$('copy').textContent='Copy transcript',1200); };

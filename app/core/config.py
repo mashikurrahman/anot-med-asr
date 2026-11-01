@@ -95,6 +95,12 @@ class Settings(BaseModel):
     NON_ENGLISH_MARK: bool = Field(default_factory=lambda: os.getenv("ANOT_NON_ENGLISH_MARK", "false").lower() == "true")
     LANG_WINDOW_SEC: float = Field(default_factory=lambda: float(os.getenv("ANOT_LANG_WINDOW_SEC", "15")))
     LANG_EN_THRESHOLD: float = Field(default_factory=lambda: float(os.getenv("ANOT_LANG_EN_THRESHOLD", "0.4")))
+    # SOAP note generation (Anthropic API). Disabled until ANTHROPIC_API_KEY is set. Transcripts are PHI:
+    # use an Anthropic account covered by a BAA (and zero data retention if your policy requires it).
+    ANTHROPIC_API_KEY: str = Field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
+    SOAP_MODEL: str = Field(default_factory=lambda: os.getenv("ANOT_SOAP_MODEL", "claude-haiku-4-5"))
+    SOAP_MAX_TOKENS: int = Field(default_factory=lambda: int(os.getenv("ANOT_SOAP_MAX_TOKENS", "4000")))
+    SOAP_TIMEOUT_SECONDS: float = Field(default_factory=lambda: float(os.getenv("ANOT_SOAP_TIMEOUT", "120")))
     WHISPER_HOTWORDS: str = Field(default_factory=lambda: os.getenv("ANOT_WHISPER_HOTWORDS", ""))
     # Anti-hallucination / silence-rejection thresholds (faster-whisper defaults
     # tightened slightly for clinical audio).
