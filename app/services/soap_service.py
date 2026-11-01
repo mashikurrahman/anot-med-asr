@@ -8,6 +8,7 @@ logged, and errors returned to callers never contain transcript text.
 
 import json
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 import anthropic
@@ -53,6 +54,17 @@ SOAP_SCHEMA: Dict[str, Any] = {
     "required": ["subjective", "objective", "assessment", "plan", "flags"],
     "additionalProperties": False,
 }
+
+
+_GEN5 = re.compile(r"^claude-(haiku|sonnet|opus|fable|mythos)-5")
+
+
+def build_output_config(model: str, effort: str) -> Dict[str, Any]:
+    """JSON-schema output for every model; reasoning effort only for 5.x models (older ones reject it)."""
+    config: Dict[str, Any] = {"format": {"type": "json_schema", "schema": SOAP_SCHEMA}}
+    if _GEN5.match(model or "") and effort:
+        config["effort"] = effort
+    return config
 
 
 class SoapGenerationError(Exception):
@@ -108,7 +120,7 @@ class SoapService:
                 max_tokens=settings.SOAP_MAX_TOKENS,
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": build_user_message(transcript)}],
-                output_config={"format": {"type": "json_schema", "schema": SOAP_SCHEMA}},
+                output_config=build_output_config(settings.SOAP_MODEL, settings.SOAP_EFFORT),
             )
         except anthropic.AuthenticationError as e:
             logger.error("soap auth failure request_id=%s", request_id)

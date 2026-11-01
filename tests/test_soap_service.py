@@ -10,7 +10,7 @@ from unittest.mock import patch
 import anthropic
 import httpx
 
-from app.services.soap_service import (NOT_DOCUMENTED, SoapGenerationError, SoapService, build_user_message,
+from app.services.soap_service import (NOT_DOCUMENTED, build_output_config, SoapGenerationError, SoapService, build_user_message,
                                        parse_soap)
 
 GOOD = {"subjective": "- Foot pain x15 days", "objective": "- Swelling, inner heel", "assessment": "- Likely bone spur",
@@ -98,6 +98,13 @@ class TestGenerate(unittest.TestCase):
             with self.assertRaises(SoapGenerationError) as cm:
                 _run(SoapService().generate("hello"))
             self.assertEqual(cm.exception.status_code, 503)
+
+    def test_effort_only_for_5x_models(self):
+        self.assertEqual(build_output_config("claude-haiku-5-5", "medium")["effort"], "medium")
+        self.assertEqual(build_output_config("claude-sonnet-5-5", "low")["effort"], "low")
+        self.assertNotIn("effort", build_output_config("claude-haiku-4-5", "medium"))
+        self.assertNotIn("effort", build_output_config("claude-haiku-5-5", ""))
+        self.assertEqual(build_output_config("claude-haiku-4-5", "medium")["format"]["type"], "json_schema")
 
     def test_user_message_wraps_transcript(self):
         self.assertEqual(build_user_message("  hi  "), "<transcript>\nhi\n</transcript>")

@@ -99,7 +99,9 @@ class Settings(BaseModel):
     # use an Anthropic account covered by a BAA (and zero data retention if your policy requires it).
     ANTHROPIC_API_KEY: str = Field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
     SOAP_MODEL: str = Field(default_factory=lambda: os.getenv("ANOT_SOAP_MODEL", "claude-haiku-4-5"))
-    SOAP_MAX_TOKENS: int = Field(default_factory=lambda: int(os.getenv("ANOT_SOAP_MAX_TOKENS", "4000")))
+    SOAP_MAX_TOKENS: int = Field(default_factory=lambda: int(os.getenv("ANOT_SOAP_MAX_TOKENS", "16000")))
+    # Reasoning depth for the Claude 5.x models (ignored for older ones, which do not accept it).
+    SOAP_EFFORT: str = Field(default_factory=lambda: os.getenv("ANOT_SOAP_EFFORT", "medium"))
     SOAP_TIMEOUT_SECONDS: float = Field(default_factory=lambda: float(os.getenv("ANOT_SOAP_TIMEOUT", "120")))
     WHISPER_HOTWORDS: str = Field(default_factory=lambda: os.getenv("ANOT_WHISPER_HOTWORDS", ""))
     # Anti-hallucination / silence-rejection thresholds (faster-whisper defaults
