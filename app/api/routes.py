@@ -190,6 +190,7 @@ async def transcribe_conversation(
 
 @router.post(
     "/v1/listen",
+    dependencies=[Depends(verify_auth_boundary)],
     summary="Deepgram Nova-3 Drop-In Compatibility Endpoint",
     description="Accepts raw audio or multipart forms and returns Deepgram-format JSON to migrate existing web apps with 0 client changes."
 )

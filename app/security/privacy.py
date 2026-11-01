@@ -6,6 +6,7 @@ Stage 11: Request anonymization, filename sanitization, and authentication inter
 """
 
 import hashlib
+import hmac
 import os
 import pathlib
 import uuid
@@ -18,6 +19,13 @@ from app.core.config import settings
 
 # Authentication header boundary
 API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
+# Deepgram-style clients send "Authorization: Token <key>" (or "Bearer <key>").
+AUTHORIZATION_HEADER = APIKeyHeader(name="Authorization", auto_error=False)
+
+
+def _key_from_authorization(value: Optional[str]) -> Optional[str]:
+    parts = (value or "").split(None, 1)
+    return parts[1].strip() if len(parts) == 2 and parts[0].lower() in ("token", "bearer") else None
 
 
 def generate_request_id() -> str:
@@ -46,16 +54,19 @@ def sanitize_filename(original_filename: Optional[str]) -> str:
 
 
 async def verify_auth_boundary(
-    api_key: Optional[str] = Security(API_KEY_HEADER)
+    api_key: Optional[str] = Security(API_KEY_HEADER),
+    authorization: Optional[str] = Security(AUTHORIZATION_HEADER),
 ) -> None:
     """
     Security boundary dependency for FastAPI endpoints.
     In development / private deployment (settings.API_KEY is None), all requests are allowed.
-    In authenticated environments, validates the X-API-Key header.
+    In authenticated environments, validates the X-API-Key header or a
+    Deepgram-style "Authorization: Token <key>" header.
     """
     expected_key = settings.API_KEY
     if expected_key is not None:
-        if not api_key or api_key != expected_key:
+        presented = api_key or _key_from_authorization(authorization)
+        if not presented or not hmac.compare_digest(presented.encode(), expected_key.encode()):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Unauthorized: invalid or missing API key."
