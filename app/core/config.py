@@ -103,6 +103,9 @@ class Settings(BaseModel):
     # Reasoning depth for the Claude 5.x models (ignored for older ones, which do not accept it).
     SOAP_EFFORT: str = Field(default_factory=lambda: os.getenv("ANOT_SOAP_EFFORT", "medium"))
     SOAP_TIMEOUT_SECONDS: float = Field(default_factory=lambda: float(os.getenv("ANOT_SOAP_TIMEOUT", "120")))
+    # Batched GPU decoding (about 2x faster, same accuracy on the benchmark). Leave off on CPU hosts.
+    WHISPER_BATCHED: bool = Field(default_factory=lambda: os.getenv("ANOT_WHISPER_BATCHED", "false").lower() == "true")
+    WHISPER_BATCH_SIZE: int = Field(default_factory=lambda: int(os.getenv("ANOT_WHISPER_BATCH_SIZE", "16")))
     WHISPER_HOTWORDS: str = Field(default_factory=lambda: os.getenv("ANOT_WHISPER_HOTWORDS", ""))
     # Anti-hallucination / silence-rejection thresholds (faster-whisper defaults
     # tightened slightly for clinical audio).

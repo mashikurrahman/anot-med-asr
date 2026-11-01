@@ -57,6 +57,7 @@ image = (
         "ANOT_ASR_DEBUG": "false",
         "ANOT_WHISPER_MODEL": "/vol/models/ft-ct2",  # fine-tuned (PHI-derived) weights, private volume only
         "ANOT_WHISPER_PLAIN": "true",
+        "ANOT_WHISPER_BATCHED": "true",
         "ANOT_TERM_CORRECTION": "true",
         "ANOT_NON_ENGLISH_MARK": "true",
         "ANOT_STRIP_FILLERS": "true",
@@ -85,8 +86,8 @@ image = (
 
 @app.function(
     image=image,
-    gpu="T4",
-    scaledown_window=300,          # keep warm 5 min after last request, then scale to 0
+    gpu="A10G",                    # ~2.5x faster than T4 for ~1.9x the hourly price
+    scaledown_window=600,          # keep warm 10 min after last request, then scale to 0
     timeout=60 * 30,              # allow long recordings
     volumes={"/vol": modal.Volume.from_name("asr-ft")},
     secrets=[

@@ -115,6 +115,11 @@ class WhisperASRModel:
             self._device = "cpu"
             self._compute_type = "int8"
 
+        self._batched = None
+        if settings.WHISPER_BATCHED:
+            from faster_whisper import BatchedInferencePipeline
+            self._batched = BatchedInferencePipeline(model=self._model)
+
         # Warm-up on 1s of silence to avoid first-request latency.
         try:
             _ = list(self._model.transcribe(np.zeros(16000, dtype=np.float32), language="en")[0])
@@ -194,19 +199,22 @@ class WhisperASRModel:
     def _decode(self, chunk: np.ndarray, offset: float, fw_language: Optional[str],
                 initial_prompt: Optional[str], hotwords: Optional[str]) -> Tuple[List[Dict[str, Any]], Optional[str]]:
         """Run faster-whisper on one chunk; timestamps are shifted by `offset` seconds."""
-        seg_iter, info = self._model.transcribe(
-            chunk,
+        shared = dict(
             language=fw_language,
             beam_size=settings.WHISPER_BEAM_SIZE,
-            vad_filter=True,
             word_timestamps=settings.WHISPER_WORD_TIMESTAMPS,
-            condition_on_previous_text=False,  # avoids runaway repetition on silence
             initial_prompt=initial_prompt,
             hotwords=hotwords,
             no_speech_threshold=settings.WHISPER_NO_SPEECH_THRESHOLD,
             log_prob_threshold=settings.WHISPER_LOGPROB_THRESHOLD,
             compression_ratio_threshold=settings.WHISPER_COMPRESSION_RATIO_THRESHOLD,
         )
+        if getattr(self, "_batched", None) is not None:  # several windows decoded at once on the GPU: ~2x faster
+            seg_iter, info = self._batched.transcribe(chunk, batch_size=settings.WHISPER_BATCH_SIZE, **shared)
+        else:
+            seg_iter, info = self._model.transcribe(
+                chunk, vad_filter=True, condition_on_previous_text=False,  # no runaway repetition on silence
+                **shared)
         out: List[Dict[str, Any]] = []
         for s in seg_iter:
             text = s.text.strip()
