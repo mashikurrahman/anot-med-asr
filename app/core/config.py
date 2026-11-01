@@ -98,7 +98,7 @@ class Settings(BaseModel):
     # SOAP note generation (Anthropic API). Disabled until ANTHROPIC_API_KEY is set. Transcripts are PHI:
     # use an Anthropic account covered by a BAA (and zero data retention if your policy requires it).
     ANTHROPIC_API_KEY: str = Field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
-    SOAP_MODEL: str = Field(default_factory=lambda: os.getenv("ANOT_SOAP_MODEL", "claude-haiku-4-5"))
+    SOAP_MODEL: str = Field(default_factory=lambda: os.getenv("ANOT_SOAP_MODEL", "claude-haiku-5-5"))
     SOAP_MAX_TOKENS: int = Field(default_factory=lambda: int(os.getenv("ANOT_SOAP_MAX_TOKENS", "16000")))
     # Reasoning depth for the Claude 5.x models (ignored for older ones, which do not accept it).
     SOAP_EFFORT: str = Field(default_factory=lambda: os.getenv("ANOT_SOAP_EFFORT", "medium"))
