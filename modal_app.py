@@ -57,6 +57,8 @@ image = (
         "ANOT_WHISPER_MODEL": "/vol/models/ft-ct2",  # fine-tuned (PHI-derived) weights, private volume only
         "ANOT_WHISPER_PLAIN": "true",
         "ANOT_TERM_CORRECTION": "true",
+        "ANOT_STRIP_FILLERS": "true",
+        "ANOT_DICTATION_COMMANDS": "true",
         "ANOT_WHISPER_WORD_TIMESTAMPS": "true",
         "ANOT_WHISPER_NO_SPEECH_THRESHOLD": "0.8",
         "ANOT_WHISPER_DEVICE": "cuda",

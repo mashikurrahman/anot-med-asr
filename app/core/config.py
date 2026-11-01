@@ -83,6 +83,10 @@ class Settings(BaseModel):
     # validated without them (prompting did not help it), so deploy it with this on.
     WHISPER_PLAIN: bool = Field(default_factory=lambda: os.getenv("ANOT_WHISPER_PLAIN", "false").lower() == "true")
     # Fix high-confidence drug-name mishearings (albedo -> albuterol) after ASR.
+    # Remove "uh"/"um" fillers from the final transcript (raw_transcript keeps them).
+    STRIP_FILLERS: bool = Field(default_factory=lambda: os.getenv("ANOT_STRIP_FILLERS", "false").lower() == "true")
+    # Turn spoken "period"/"comma"/"enter" dictation commands into punctuation / new lines.
+    DICTATION_COMMANDS: bool = Field(default_factory=lambda: os.getenv("ANOT_DICTATION_COMMANDS", "false").lower() == "true")
     TERM_CORRECTION: bool = Field(default_factory=lambda: os.getenv("ANOT_TERM_CORRECTION", "false").lower() == "true")
     # Real per-word timestamps/probabilities (used by /v1/listen). Costs a little extra decode time.
     WHISPER_WORD_TIMESTAMPS: bool = Field(default_factory=lambda: os.getenv("ANOT_WHISPER_WORD_TIMESTAMPS", "false").lower() == "true")

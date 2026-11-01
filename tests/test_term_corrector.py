@@ -27,6 +27,16 @@ class TestTermCorrector(unittest.TestCase):
         s = "Hearing is fine, the bacteria were gone this morning and the steroid helped."
         self.assertEqual(correct_terms(s), s)
 
+    def test_context_rules(self):
+        self.assertEqual(correct_terms("General skin ahead normal."), "General skin head normal.")
+        self.assertEqual(correct_terms("Eyelid perlin discharge present."), "Eyelid purulent discharge present.")
+        self.assertEqual(correct_terms("Exam, vital is within normal limit."), "Exam, vitals within normal limit.")
+        self.assertEqual(correct_terms("Eyes, eyelid Perlin discharge."), "Eyes, eyelid purulent discharge.")
+
+    def test_context_rules_leave_normal_uses(self):
+        s = "Go ahead and sit. The perlin noise is unrelated, and the vital is in the chart."
+        self.assertEqual(correct_terms(s), s)
+
     def test_empty_and_none_safe(self):
         self.assertEqual(correct_terms(""), "")
 

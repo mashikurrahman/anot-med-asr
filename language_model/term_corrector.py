@@ -26,6 +26,13 @@ ALIASES: Dict[str, str] = {
     "augmenten": "Augmentin", "augmentan": "Augmentin",
 }
 
+# (pattern, replacement): fixes that are only safe in a specific clinical context.
+CONTEXT_RULES = (
+    (re.compile(r"\bahead(?=\s+normal\b)", re.I), "head"),            # "skin ahead normal"
+    (re.compile(r"\bperlin(?=\s+discharge\b)", re.I), "purulent"),    # "eyelid perlin discharge"
+    (re.compile(r"\bvital is(?=\s+within\b)", re.I), "vitals"),       # "vital is within normal limit"
+)
+
 FUZZY_MIN_RATIO = 0.88
 FUZZY_MIN_LEN = 7
 _WORD = re.compile(r"[A-Za-z][A-Za-z'-]*")
@@ -59,10 +66,18 @@ def _match_case(src: str, repl: str) -> str:
     return repl[0].upper() + repl[1:] if src[:1].isupper() and repl[:1].islower() else repl
 
 
+def _starts_sentence(m: "re.Match[str]") -> bool:
+    before = m.string[: m.start()].rstrip()
+    return not before or before[-1] in ".!?"
+
+
 def correct_terms(text: str) -> str:
     """Return `text` with high-confidence medical-term mistakes fixed."""
     if not text:
         return text
+    for pattern, repl in CONTEXT_RULES:
+        text = pattern.sub(
+            lambda m, r=repl: _match_case(m.group(), r) if _starts_sentence(m) else r, text)
     spans = [(m.start(), m.end(), m.group()) for m in _WORD.finditer(text)]
     out, last, i = [], 0, 0
     while i < len(spans):

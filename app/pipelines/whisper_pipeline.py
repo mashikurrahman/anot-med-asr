@@ -22,6 +22,7 @@ from app.models.whisper_model import WhisperASRModel
 from app.services.normalization_service import NormalizationService
 from audio.enhancement import enhance_waveform
 from language_model.term_corrector import correct_terms
+from language_model.transcript_cleanup import apply_dictation_commands, strip_fillers
 
 
 class WhisperPipeline:
@@ -30,6 +31,17 @@ class WhisperPipeline:
     def __init__(self, model: WhisperASRModel, normalization_service: NormalizationService):
         self.model = model
         self.normalization_service = normalization_service
+
+    @staticmethod
+    def _clean(text: str) -> str:
+        """Drug-name fixes, then filler removal, then spoken-punctuation commands (each opt-in)."""
+        if settings.TERM_CORRECTION:
+            text = correct_terms(text)
+        if settings.STRIP_FILLERS:
+            text = strip_fillers(text)
+        if settings.DICTATION_COMMANDS:
+            text = apply_dictation_commands(text)
+        return text
 
     def process(
         self,
@@ -65,11 +77,11 @@ class WhisperPipeline:
             proc_wave, sample_rate, language=language)
         detected_language = getattr(self.model, "_last_detected_language", language or "en")
 
-        # High-confidence drug-name fixes (English only); raw_transcript stays untouched.
+        # Optional text fixes (English only); raw_transcript stays untouched.
         text, seg_list = raw_text, raw_segments
-        if settings.TERM_CORRECTION and str(detected_language).lower().startswith("en"):
-            text = correct_terms(raw_text)
-            seg_list = [{**seg, "text": correct_terms(seg["text"])} for seg in raw_segments]
+        if str(detected_language).lower().startswith("en"):
+            text = self._clean(raw_text)
+            seg_list = [{**seg, "text": self._clean(seg["text"])} for seg in raw_segments]
 
         norm_time = 0.0
         final_text = text
