@@ -18,7 +18,8 @@ from typing import Dict, FrozenSet, Optional, Tuple
 ALIASES: Dict[str, str] = {
     "albedo": "albuterol", "albedol": "albuterol", "albuteral": "albuterol", "albuterall": "albuterol",
     "pseudofad": "sudafed", "pseudo fed": "sudafed",
-    "ezetromycin": "azithromycin", "azithromicin": "azithromycin",
+    "ezetromycin": "azithromycin", "azithromicin": "azithromycin", "zithromycin": "azithromycin",
+    "a zithromycin": "azithromycin",
     "salumedril": "Solu-Medrol", "solumedrol": "Solu-Medrol", "solu medrol": "Solu-Medrol",
     "doxy cycling": "doxycycline", "doxycycling": "doxycycline", "doxicycline": "doxycycline",
     "amoxicilin": "amoxicillin", "amoxycillin": "amoxicillin",

@@ -188,7 +188,7 @@ class WhisperASRModel:
         p_en: List[Optional[float]] = []
         for k in range(0, waveform.size, step):
             seg = waveform[k:k + step]
-            if seg.size < 3 * 16000 or float(np.sqrt(np.mean(np.square(seg)))) < 1e-4:
+            if seg.size < settings.LANG_MIN_SEC * 16000 or float(np.sqrt(np.mean(np.square(seg)))) < 1e-4:
                 p_en.append(None)
                 continue
             _lang, _prob, all_probs = self._model.detect_language(seg)

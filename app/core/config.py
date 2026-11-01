@@ -94,6 +94,8 @@ class Settings(BaseModel):
     # marker instead of letting the decoder invent English for them. English-language runs only.
     NON_ENGLISH_MARK: bool = Field(default_factory=lambda: os.getenv("ANOT_NON_ENGLISH_MARK", "false").lower() == "true")
     LANG_WINDOW_SEC: float = Field(default_factory=lambda: float(os.getenv("ANOT_LANG_WINDOW_SEC", "15")))
+    # Windows shorter than this are not language-checked (too little speech to judge); they inherit the neighbour.
+    LANG_MIN_SEC: float = Field(default_factory=lambda: float(os.getenv("ANOT_LANG_MIN_SEC", "8")))
     LANG_EN_THRESHOLD: float = Field(default_factory=lambda: float(os.getenv("ANOT_LANG_EN_THRESHOLD", "0.4")))
     # SOAP note generation (Anthropic API). Disabled until ANTHROPIC_API_KEY is set. Transcripts are PHI:
     # use an Anthropic account covered by a BAA (and zero data retention if your policy requires it).
