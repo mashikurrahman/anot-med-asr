@@ -42,6 +42,8 @@ def build_words(segments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Return Deepgram-style word dicts (word/start/end/confidence) for all segments."""
     words: List[Dict[str, Any]] = []
     for seg in segments:
+        if seg.get("non_english"):
+            continue  # marker segment, not spoken words
         tokens = (seg.get("text") or "").split()
         if not tokens:
             continue

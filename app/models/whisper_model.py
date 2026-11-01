@@ -22,6 +22,7 @@ import numpy as np
 
 from app.core.config import settings
 from app.core.logging import logger
+from language_model.language_spans import build_spans, english_flags, format_marker
 from language_model.phrase_library import build_hotwords, build_initial_prompt
 
 
@@ -150,8 +151,51 @@ class WhisperASRModel:
         initial_prompt = None if settings.WHISPER_PLAIN else _resolve_prompt(lang)
 
         t0 = time.perf_counter()
-        seg_iter, _info = self._model.transcribe(
-            waveform,
+        spans = self._plan_spans(waveform) if (settings.NON_ENGLISH_MARK and lang == "en") else             [(0.0, waveform.size / 16000.0, True)]
+        segments: List[Dict[str, Any]] = []
+        low_conf = 0
+        self._last_detected_language = fw_language or lang
+        non_english_sec = 0.0
+        for span_start, span_end, is_english in spans:
+            if not is_english:
+                non_english_sec += span_end - span_start
+                segments.append({
+                    "start": round(span_start, 2), "end": round(span_end, 2),
+                    "text": format_marker(span_start, span_end), "non_english": True,
+                    "avg_logprob": None, "no_speech_prob": None, "low_confidence": True,
+                })
+                continue
+            chunk = waveform[int(span_start * 16000):int(span_end * 16000)]
+            span_segments, detected = self._decode(chunk, span_start, fw_language, initial_prompt, hotwords)
+            if detected and len(spans) == 1:
+                self._last_detected_language = detected
+            segments.extend(span_segments)
+        low_conf = sum(1 for sg in segments if sg.get("low_confidence") and not sg.get("non_english"))
+        self._last_non_english_seconds = non_english_sec
+        inference_time = time.perf_counter() - t0
+        self._last_low_confidence_count = low_conf
+        return " ".join(sg["text"] for sg in segments).strip(), segments, inference_time
+
+    def _plan_spans(self, waveform: np.ndarray) -> List[Tuple[float, float, bool]]:
+        """Split the recording into English / non-English spans from per-window language detection."""
+        win = settings.LANG_WINDOW_SEC
+        step = int(win * 16000)
+        p_en: List[Optional[float]] = []
+        for k in range(0, waveform.size, step):
+            seg = waveform[k:k + step]
+            if seg.size < 3 * 16000 or float(np.sqrt(np.mean(np.square(seg)))) < 1e-4:
+                p_en.append(None)
+                continue
+            _lang, _prob, all_probs = self._model.detect_language(seg)
+            p_en.append(float(dict(all_probs).get("en", 0.0)))
+        flags = english_flags(p_en, settings.LANG_EN_THRESHOLD)
+        return build_spans(flags, win, waveform.size / 16000.0)
+
+    def _decode(self, chunk: np.ndarray, offset: float, fw_language: Optional[str],
+                initial_prompt: Optional[str], hotwords: Optional[str]) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+        """Run faster-whisper on one chunk; timestamps are shifted by `offset` seconds."""
+        seg_iter, info = self._model.transcribe(
+            chunk,
             language=fw_language,
             beam_size=settings.WHISPER_BEAM_SIZE,
             vad_filter=True,
@@ -163,10 +207,7 @@ class WhisperASRModel:
             log_prob_threshold=settings.WHISPER_LOGPROB_THRESHOLD,
             compression_ratio_threshold=settings.WHISPER_COMPRESSION_RATIO_THRESHOLD,
         )
-        self._last_detected_language = getattr(_info, "language", fw_language or lang)
-        segments: List[Dict[str, Any]] = []
-        parts: List[str] = []
-        low_conf = 0
+        out: List[Dict[str, Any]] = []
         for s in seg_iter:
             text = s.text.strip()
             if not text:
@@ -174,24 +215,19 @@ class WhisperASRModel:
             avg_lp = getattr(s, "avg_logprob", None)
             no_speech = getattr(s, "no_speech_prob", None)
             is_low = avg_lp is not None and avg_lp < settings.WHISPER_LOW_CONFIDENCE_LOGPROB
-            if is_low:
-                low_conf += 1
-            parts.append(text)
-            segments.append({
-                "start": round(s.start, 2),
-                "end": round(s.end, 2),
+            out.append({
+                "start": round(s.start + offset, 2),
+                "end": round(s.end + offset, 2),
                 "text": text,
                 "avg_logprob": round(avg_lp, 3) if avg_lp is not None else None,
                 "no_speech_prob": round(no_speech, 3) if no_speech is not None else None,
                 "low_confidence": bool(is_low),
-                **({"words": [{"word": w.word, "start": round(w.start, 3), "end": round(w.end, 3),
-                               "probability": round(w.probability, 3)} for w in s.words]}
+                **({"words": [{"word": w.word, "start": round(w.start + offset, 3),
+                               "end": round(w.end + offset, 3), "probability": round(w.probability, 3)}
+                              for w in s.words]}
                    if settings.WHISPER_WORD_TIMESTAMPS and getattr(s, "words", None) else {}),
             })
-
-        inference_time = time.perf_counter() - t0
-        self._last_low_confidence_count = low_conf
-        return " ".join(parts).strip(), segments, inference_time
+        return out, getattr(info, "language", None)
 
     def unload(self) -> None:
         self._model = None

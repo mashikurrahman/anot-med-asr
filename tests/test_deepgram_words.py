@@ -41,6 +41,10 @@ class TestBuildWords(unittest.TestCase):
         self.assertEqual(len(w), 2)
         self.assertTrue(all(0.0 <= x["confidence"] <= 1.0 for x in w))
 
+    def test_non_english_marker_segments_are_skipped(self):
+        seg = {"start": 0.0, "end": 9.0, "text": "[Non-English speech, 0:00-0:09]", "non_english": True}
+        self.assertEqual(build_words([seg]), [])
+
     def test_empty_inputs(self):
         self.assertEqual(build_words([]), [])
         self.assertEqual(build_words([{"start": 0, "end": 1, "text": "  "}]), [])

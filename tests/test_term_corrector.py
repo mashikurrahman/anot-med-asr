@@ -27,6 +27,11 @@ class TestTermCorrector(unittest.TestCase):
         s = "Hearing is fine, the bacteria were gone this morning and the steroid helped."
         self.assertEqual(correct_terms(s), s)
 
+    def test_kenalog_mishearings(self):
+        self.assertEqual(correct_terms("give the catalog injection now"), "give the Kenalog injection now")
+        self.assertEqual(correct_terms("the Kenilov injection"), "the Kenalog injection")
+        self.assertEqual(correct_terms("pull up the product catalog"), "pull up the product catalog")
+
     def test_context_rules(self):
         self.assertEqual(correct_terms("General skin ahead normal."), "General skin head normal.")
         self.assertEqual(correct_terms("Eyelid perlin discharge present."), "Eyelid purulent discharge present.")

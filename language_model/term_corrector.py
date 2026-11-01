@@ -23,6 +23,7 @@ ALIASES: Dict[str, str] = {
     "doxy cycling": "doxycycline", "doxycycling": "doxycycline", "doxicycline": "doxycycline",
     "amoxicilin": "amoxicillin", "amoxycillin": "amoxicillin",
     "benadrill": "Benadryl",
+    "kenilov": "Kenalog", "kenalov": "Kenalog", "catalog injection": "Kenalog injection",
     "augmenten": "Augmentin", "augmentan": "Augmentin",
 }
 

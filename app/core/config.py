@@ -90,6 +90,11 @@ class Settings(BaseModel):
     TERM_CORRECTION: bool = Field(default_factory=lambda: os.getenv("ANOT_TERM_CORRECTION", "false").lower() == "true")
     # Real per-word timestamps/probabilities (used by /v1/listen). Costs a little extra decode time.
     WHISPER_WORD_TIMESTAMPS: bool = Field(default_factory=lambda: os.getenv("ANOT_WHISPER_WORD_TIMESTAMPS", "false").lower() == "true")
+    # Replace non-English stretches (English-only engine) with a "[Non-English speech, m:ss-m:ss]"
+    # marker instead of letting the decoder invent English for them. English-language runs only.
+    NON_ENGLISH_MARK: bool = Field(default_factory=lambda: os.getenv("ANOT_NON_ENGLISH_MARK", "false").lower() == "true")
+    LANG_WINDOW_SEC: float = Field(default_factory=lambda: float(os.getenv("ANOT_LANG_WINDOW_SEC", "15")))
+    LANG_EN_THRESHOLD: float = Field(default_factory=lambda: float(os.getenv("ANOT_LANG_EN_THRESHOLD", "0.4")))
     WHISPER_HOTWORDS: str = Field(default_factory=lambda: os.getenv("ANOT_WHISPER_HOTWORDS", ""))
     # Anti-hallucination / silence-rejection thresholds (faster-whisper defaults
     # tightened slightly for clinical audio).
