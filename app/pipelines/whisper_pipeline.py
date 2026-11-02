@@ -12,25 +12,55 @@ used by the MedASR path, so clinical representation (dosages, vitals) is
 standardized consistently regardless of engine.
 """
 
+import logging
 import time
-from typing import Any, Dict, Optional
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
 from app.core.config import settings
 from app.models.whisper_model import WhisperASRModel
+from app.services.diarization_service import DiarizationError, Diarizer
 from app.services.normalization_service import NormalizationService
+from app.services.speaker_assign import assign_speakers, render_transcript
 from audio.enhancement import enhance_waveform
 from language_model.term_corrector import correct_terms
 from language_model.transcript_cleanup import apply_dictation_commands, strip_fillers
+
+logger = logging.getLogger("anot.pipeline")
 
 
 class WhisperPipeline:
     """End-to-end transcription pipeline for the Whisper engine."""
 
-    def __init__(self, model: WhisperASRModel, normalization_service: NormalizationService):
+    def __init__(self, model: WhisperASRModel, normalization_service: NormalizationService, diarizer=None):
         self.model = model
         self.normalization_service = normalization_service
+        self._diarizer = diarizer
+
+    def _start_diarization(self, wave: np.ndarray, sample_rate: int, mode: str):
+        """Run speaker diarization in a background thread so it overlaps with transcription."""
+        if not (settings.DIARIZE and mode == "conversation"):
+            return None
+        diarizer = self._diarizer or Diarizer.get()
+        executor = ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(diarizer.diarize, wave, sample_rate)
+        executor.shutdown(wait=False)
+        return future
+
+    @staticmethod
+    def _collect_turns(future) -> List[Tuple[float, float, str]]:
+        if future is None:
+            return []
+        try:
+            return future.result()
+        except DiarizationError as e:  # speaker labels are optional: keep the transcript
+            logger.warning("diarization skipped: %s", e)
+            return []
+        except Exception:
+            logger.exception("diarization crashed; continuing without speaker labels")
+            return []
 
     @staticmethod
     def _clean(text: str) -> str:
@@ -73,8 +103,11 @@ class WhisperPipeline:
             )
             enhance_time = time.perf_counter() - t_enh
 
+        diarization = self._start_diarization(proc_wave, sample_rate, mode)
         raw_text, raw_segments, inference_time = self.model.transcribe(
             proc_wave, sample_rate, language=language)
+        raw_segments = assign_speakers(raw_segments, self._collect_turns(diarization))
+        speakers_on = any(sg.get("speaker") for sg in raw_segments)
         detected_language = getattr(self.model, "_last_detected_language", language or "en")
 
         # Optional text fixes (English only); raw_transcript stays untouched.
@@ -94,6 +127,12 @@ class WhisperPipeline:
                 seg_text, _ev, _t = self.normalization_service.normalize_text(seg["text"])
                 norm_segments.append({**seg, "text": seg_text})
             segments = norm_segments
+
+        if speakers_on:  # "Speaker 1: ..." lines; cleanup and normalization see each whole turn
+            def tidy(turn_text: str) -> str:
+                cleaned = self._clean(turn_text) if str(detected_language).lower().startswith("en") else turn_text
+                return self.normalization_service.normalize_text(cleaned)[0] if normalize and cleaned else cleaned
+            final_text = render_transcript(raw_segments, transform=tidy)
 
         if not segments and final_text:
             segments = [{"start": 0.0, "end": round(audio_duration, 2), "text": final_text}]

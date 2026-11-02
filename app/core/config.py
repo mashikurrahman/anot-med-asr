@@ -108,6 +108,12 @@ class Settings(BaseModel):
     # Batched GPU decoding (about 2x faster, same accuracy on the benchmark). Leave off on CPU hosts.
     WHISPER_BATCHED: bool = Field(default_factory=lambda: os.getenv("ANOT_WHISPER_BATCHED", "false").lower() == "true")
     WHISPER_BATCH_SIZE: int = Field(default_factory=lambda: int(os.getenv("ANOT_WHISPER_BATCH_SIZE", "16")))
+    # Speaker labels ("Speaker 1", "Speaker 2") in visit transcripts, from pyannote diarization. The model is
+    # gated on Hugging Face: accept its terms once and provide a read token at image build time.
+    DIARIZE: bool = Field(default_factory=lambda: os.getenv("ANOT_DIARIZE", "false").lower() == "true")
+    DIARIZE_MODEL: str = Field(default_factory=lambda: os.getenv("ANOT_DIARIZE_MODEL", "pyannote/speaker-diarization-community-1"))
+    DIARIZE_MAX_SPEAKERS: int = Field(default_factory=lambda: int(os.getenv("ANOT_DIARIZE_MAX_SPEAKERS", "0")))
+    HF_TOKEN: str = Field(default_factory=lambda: os.getenv("HF_TOKEN", ""))
     WHISPER_HOTWORDS: str = Field(default_factory=lambda: os.getenv("ANOT_WHISPER_HOTWORDS", ""))
     # Anti-hallucination / silence-rejection thresholds (faster-whisper defaults
     # tightened slightly for clinical audio).
