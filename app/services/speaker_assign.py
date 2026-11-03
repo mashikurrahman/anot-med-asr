@@ -4,10 +4,11 @@ Combine ASR segments with speaker turns from a diarization model.
 
 `turns` are (start_sec, end_sec, raw_speaker_id). Raw ids are renamed to
 "Speaker 1", "Speaker 2", ... in order of first appearance. Segments that carry
-word timings are split where the speaker changes; other segments take the
+word timings are split between sentences where the speaker changes; other segments take the
 speaker with the largest overlap. Pure functions: inputs are never modified.
 """
 
+import re
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 Turn = Tuple[float, float, str]
@@ -44,14 +45,32 @@ def _majority_speaker(start: float, end: float, turns: Sequence[Turn]) -> str:
     return _speaker_at((start + end) / 2.0, turns)
 
 
+_SENTENCE_END = (".", "?", "!")
+
+
+def _sentences(words: Sequence[Dict[str, Any]]) -> List[List[Dict[str, Any]]]:
+    """Group words into sentences (a word ending in . ? ! closes one)."""
+    out: List[List[Dict[str, Any]]] = []
+    current: List[Dict[str, Any]] = []
+    for word in words:
+        current.append(word)
+        if str(word["word"]).strip().endswith(_SENTENCE_END):
+            out.append(current)
+            current = []
+    if current:
+        out.append(current)
+    return out
+
+
 def _split_by_words(seg: Segment, turns: Sequence[Turn], names: Dict[str, str]) -> List[Segment]:
+    """One speaker per sentence (majority overlap), so overlapping talk cannot cut a sentence in two."""
     runs: List[Tuple[str, List[Dict[str, Any]]]] = []
-    for word in seg["words"]:
-        raw = _speaker_at((float(word["start"]) + float(word["end"])) / 2.0, turns)
+    for sentence in _sentences(seg["words"]):
+        raw = _majority_speaker(float(sentence[0]["start"]), float(sentence[-1]["end"]), turns)
         if runs and runs[-1][0] == raw:
-            runs[-1][1].append(word)
+            runs[-1][1].extend(sentence)
         else:
-            runs.append((raw, [word]))
+            runs.append((raw, list(sentence)))
     if len(runs) == 1:
         return [{**seg, "speaker": names[runs[0][0]]}]
     pieces: List[Segment] = []
@@ -94,7 +113,8 @@ def render_transcript(segments: Sequence[Segment], transform: Optional[Callable[
         if texts:
             body = " ".join(texts)
             body = transform(body) if transform else body
-            lines.append(f"{current}: {body}" if prefix and current else body)
+            if re.search(r"\w", body):  # a turn that was only fillers/punctuation disappears
+                lines.append(f"{current}: {body}" if prefix and current else body)
         texts = []
 
     for seg in segments:

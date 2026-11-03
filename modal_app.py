@@ -43,8 +43,15 @@ image = (
         "transformers==4.49.0",
         "anthropic>=2.3.0",
     )
-    # torch (CPU wheel) only to satisfy imports; Whisper runs on GPU via CTranslate2.
-    .pip_install("torch==2.6.0", index_url="https://download.pytorch.org/whl/cpu")
+    # CUDA torch + pyannote: speaker labels (diarization). Whisper itself runs on GPU via CTranslate2.
+    .pip_install("torch==2.8.0", "torchaudio==2.8.0", "pyannote.audio==4.0.7")
+    # The diarization model is gated on Hugging Face: download its weights once at build time with the
+    # read token in the "anot-hf" secret, then run fully offline (no token or network at runtime).
+    .run_commands(
+        "python -c \"import os; from pyannote.audio import Pipeline; "
+        "Pipeline.from_pretrained('pyannote/speaker-diarization-community-1', token=os.environ['HF_TOKEN'])\"",
+        secrets=[modal.Secret.from_name("anot-hf")],
+    )
     # Pre-bake the model into the image (no runtime download / fast cold start).
     .run_commands(
         "python -c \"from faster_whisper import WhisperModel; "
@@ -56,6 +63,8 @@ image = (
         "ANOT_ASR_ENV": "production",
         "ANOT_ASR_DEBUG": "false",
         "ANOT_WHISPER_MODEL": "/vol/models/ft-ct2",  # fine-tuned (PHI-derived) weights, private volume only
+        "HF_HUB_OFFLINE": "1",
+        "ANOT_DIARIZE": "true",
         "ANOT_WHISPER_PLAIN": "true",
         "ANOT_WHISPER_BATCHED": "true",
         "ANOT_TERM_CORRECTION": "true",

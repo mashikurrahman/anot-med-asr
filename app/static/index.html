@@ -150,7 +150,7 @@ $('go').onclick=async()=>{
       $('transcript').textContent=d.transcript||'(empty transcript)';showSoap(d);
       const segs=d.segments||[];
       $('segs').innerHTML=segs.length?segs.map(s=>'<div class="seg'+(s.low_confidence?' low':'')+'"><span class="ts">'+
-        fmt(s.start)+'–'+fmt(s.end)+'</span><span>'+esc(s.text||'')+'</span></div>').join(''):'';
+        fmt(s.start)+'–'+fmt(s.end)+'</span><span>'+esc((s.speaker?s.speaker+': ':'')+(s.text||''))+'</span></div>').join(''):'';
     }
   }catch(e){clearInterval(timer);$('transcript').innerHTML='<span class="err">Request failed: '+e.message+'</span>';}
   $('go').disabled=false;$('go').textContent='Transcribe';save();

@@ -38,6 +38,16 @@ class TestAssignSpeakers(unittest.TestCase):
         self.assertEqual(out[0]["end"], 4.5)
         self.assertEqual(out[1]["start"], 5.5)
 
+    def test_overlapping_talk_cannot_cut_a_sentence(self):
+        # the turn flips to B for the last two words, but A holds most of the sentence
+        seg = {"start": 0.0, "end": 6.0, "text": "I am like where you at?",
+               "words": [_w("I", 0.0, 0.5), _w("am", 0.5, 1.0), _w("like", 1.0, 2.0), _w("where", 2.0, 3.5),
+                         _w("you", 3.5, 4.5), _w("at?", 4.5, 5.5)]}
+        out = assign_speakers([seg], [(0.0, 3.8, "A"), (3.8, 9.0, "B")])
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["speaker"], "Speaker 1")
+        self.assertEqual(out[0]["text"], "I am like where you at?")
+
     def test_marker_segments_get_no_speaker(self):
         seg = {"start": 0.0, "end": 9.0, "text": "[Non-English speech, 0:00-0:09]", "non_english": True}
         out = assign_speakers([seg], self.TURNS)
@@ -49,8 +59,8 @@ class TestAssignSpeakers(unittest.TestCase):
 
     def test_word_in_a_gap_takes_nearest_speaker(self):
         turns = [(0.0, 2.0, "A"), (4.0, 6.0, "B")]
-        seg = {"start": 0.0, "end": 6.0, "text": "one two",
-               "words": [_w("one", 0.5, 1.0), _w("two", 5.0, 5.5)]}
+        seg = {"start": 0.0, "end": 6.0, "text": "one. two.",
+               "words": [_w("one.", 0.5, 1.0), _w("two.", 5.0, 5.5)]}
         out = assign_speakers([seg], turns)
         self.assertEqual([s["speaker"] for s in out], ["Speaker 1", "Speaker 2"])
 
@@ -82,6 +92,12 @@ class TestRender(unittest.TestCase):
                 {"text": "Okay.", "speaker": "Speaker 2"}]
         self.assertEqual(render_transcript(segs, transform=str.upper),
                          "Speaker 1: TAKE IT TWICE A DAY.\nSpeaker 2: OKAY.")
+
+    def test_turn_that_cleans_to_nothing_is_dropped(self):
+        segs = [{"text": "Hello.", "speaker": "Speaker 1"}, {"text": "Um...", "speaker": "Speaker 2"},
+                {"text": "Bye.", "speaker": "Speaker 1"}]
+        self.assertEqual(render_transcript(segs, transform=lambda t: t.replace("Um", "")),
+                         "Speaker 1: Hello.\nSpeaker 1: Bye.")
 
     def test_empty(self):
         self.assertEqual(render_transcript([]), "")
