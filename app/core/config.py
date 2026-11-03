@@ -164,7 +164,7 @@ class Settings(BaseModel):
     TEMP_DIR: pathlib.Path = Field(default_factory=lambda: pathlib.Path(os.getenv("ANOT_ASR_TEMP_DIR", str(PROJECT_ROOT / "temp" / "asr_uploads"))))
 
     # Supported audio extensions
-    SUPPORTED_EXTENSIONS: Set[str] = {".wav", ".m4a", ".mp3", ".flac", ".mp4", ".aac", ".ogg"}
+    SUPPORTED_EXTENSIONS: Set[str] = {".wav", ".m4a", ".mp3", ".flac", ".mp4", ".aac", ".ogg", ".webm", ".opus"}
 
     # Security & Auth boundary. Set ANOT_ASR_API_KEY to require an X-API-Key
     # header on transcription endpoints (strongly recommended in any deployment).
