@@ -126,6 +126,12 @@ python tests/benchmark_cpu_vs_xpu.py
 
 ---
 
+## Third-party notices
+
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Speaker labels use the pyannote `speaker-diarization-community-1` model by pyannoteAI (CC BY 4.0).
+
+---
+
 ## Disclaimer
 
 This software is for preliminary development, benchmarking, and research purposes only. It is **not** clinically certified, approved by regulatory authorities, or intended for unmonitored diagnostic or therapeutic decision-making.

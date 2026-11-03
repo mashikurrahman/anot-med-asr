@@ -216,5 +216,7 @@ function pill(k,v){ return '<span class="pill">'+k+': <b>'+v+'</b></span>'; }
 function escapeHtml(s){ return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 $('copy').onclick=()=>{ navigator.clipboard.writeText($('transcript').textContent||''); $('copy').textContent='Copied!'; setTimeout(()=>$('copy').textContent='Copy transcript',1200); };
 </script>
+
+<footer style="max-width:1100px;margin:28px auto 36px;padding:0 20px;font-size:12px;color:var(--muted);text-align:center">Speaker labels use the <a href="https://huggingface.co/pyannote/speaker-diarization-community-1" target="_blank" rel="noopener" style="color:inherit">pyannote speaker-diarization-community-1</a> model by pyannoteAI (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener" style="color:inherit">CC BY 4.0</a>). Speech recognition is based on OpenAI Whisper (MIT).</footer>
 </body>
 </html>
